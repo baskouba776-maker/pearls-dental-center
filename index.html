@@ -491,10 +491,11 @@ async function hashPw(pw,salt){
  let x=5381;for(const b of data)x=((x*33)^b)>>>0;return 'f'+x.toString(16);
 }
 async function setPw(pw){const salt=uid()+uid();S().pw={salt,hash:await hashPw(pw,salt)};save()}
-async function checkPw(pw){const p=S().pw;return !!p&&(await hashPw(pw,p.salt))===p.hash}
+const DEFAULT_PW='123456Az'; /* mot de passe par défaut : modifiable dans Paramètres */
+async function checkPw(pw){const p=S().pw;if(!p)return pw===DEFAULT_PW;return (await hashPw(pw,p.salt))===p.hash}
 function enterApp(){$('#site').classList.add('hidden');$('#app').classList.remove('hidden');window.scrollTo(0,0);render()}
 function loginDlg(){
- const first=!S().pw;
+ const first=false;
  openDlg(`<h2>${first?'Créer le mot de passe':'Espace gestion'}</h2>
  <p style="color:var(--muted);margin-top:0">${first?'Première utilisation : choisissez un mot de passe pour protéger l\'espace gestion (6 caractères minimum).':'Saisissez votre mot de passe pour continuer.'}</p>
  <form id="lf"><div class="f2">
