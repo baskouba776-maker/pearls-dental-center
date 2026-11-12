@@ -248,7 +248,7 @@ let db;
 try{db=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 db=db||JSON.parse(JSON.stringify(DEF));
 db.settings={...DEF.settings,...db.settings};db.requests=db.requests||[];db.site=db.site||{};['gallery','reviews','team'].forEach(k=>db.site[k]=db.site[k]||[]);
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Stockage impossible : exportez vos données.')}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Stockage impossible : exportez vos données.')}window.cloudPush&&window.cloudPush()};
 const S=()=>db.settings;
 const catalog=()=>S().catalog.split('\n').map(l=>l.split(';')).filter(a=>a[0].trim()).map(a=>({n:a[0].trim(),p:+a[1]||0}));
 const client=id=>db.clients.find(c=>c.id===id);
@@ -477,7 +477,7 @@ function renderDevisSite(){
    try{const bl=await resizeImg(fl,1600),key=uid();await fdb.put(key,{name:fl.name,type:bl.type||fl.type,blob:bl});files.push({key,name:fl.name,type:bl.type||fl.type})}catch(e){}
   }
   const r={id:uid(),ref:'DEV-'+Math.random().toString(36).slice(2,6).toUpperCase(),kind:'devis',created:new Date().toISOString(),statut:'attente',nom:f.nom.trim(),tel:f.tel.trim(),email:f.email.trim(),age:'',type:'particulier',societe:'',soin:f.soin||'—',date:'',creneau:'',msg:(f.msg||'').trim(),files};
-  db.requests.push(r);save();updBadge();
+  db.requests.push(r);save();updBadge();window.cloudRequest&&window.cloudRequest(r);
   const txt=`Bonjour, je souhaite un devis au ${S().name}.\nRéf : ${r.ref}\nNom : ${r.nom}\nTél : ${r.tel}${f.soin?'\nSoin : '+f.soin:''}${r.msg?'\nPrécisions : '+r.msg:''}\n(Je vous envoie mes photos ici.)`;
   box.innerHTML=`<div style="text-align:center"><div style="font-size:2.4rem">✓</div><h3>${t('devOk')}</h3><p>${t('ref')} : <b style="font-size:1.2rem">${r.ref}</b></p><p style="color:var(--muted)">${t('devOkP')}</p>
   <p><a class="btn" target="_blank" rel="noopener" href="${waLink(S().tel1,txt)}">${t('wa')}</a></p><p><button class="btn light" id="dvAgain">${t('again')}</button></p></div>`;
@@ -512,7 +512,7 @@ function loginDlg(){
    if(f.pw!==f.pw2){err.textContent='Les deux mots de passe ne correspondent pas.';return}
    await setPw(f.pw);closeDlg();enterApp();
   }else{
-   if(await checkPw(f.pw)){closeDlg();enterApp()}
+   if(await (window.cloudLogin?window.cloudLogin(f.pw):checkPw(f.pw))){closeDlg();enterApp()}
    else{err.textContent='Mot de passe incorrect.';ev.target.pw.value='';ev.target.pw.focus()}
   }};
 }
@@ -1017,10 +1017,10 @@ function vSet(){
  <div class="acts" style="justify-content:flex-start"><button class="btn dark" data-a="export">Exporter (JSON)</button><label class="btn sec" style="margin:0;cursor:pointer">Importer<input type="file" id="imp" accept=".json" class="hidden"></label></div>`;
  $('#sf').onsubmit=ev=>{ev.preventDefault();const f=Object.fromEntries(new FormData(ev.target));f.tva=+f.tva||0;Object.assign(db.settings,f);save();renderSite();alert('Paramètres enregistrés.')};
  $('#pwf').onsubmit=async ev=>{ev.preventDefault();const f=Object.fromEntries(new FormData(ev.target));
-  if(!(await checkPw(f.cur))){alert('Mot de passe actuel incorrect.');return}
+  if(!(await (window.cloudCheckPw?window.cloudCheckPw(f.cur):checkPw(f.cur)))){alert('Mot de passe actuel incorrect.');return}
   if(f.n1.length<6){alert('Le nouveau mot de passe doit contenir au moins 6 caractères.');return}
   if(f.n1!==f.n2){alert('Les deux nouveaux mots de passe ne correspondent pas.');return}
-  await setPw(f.n1);ev.target.reset();alert('Mot de passe modifié.')};
+  await (window.cloudSetPw?window.cloudSetPw(f.n1):setPw(f.n1));ev.target.reset();alert('Mot de passe modifié.')};
  $('#imp').onchange=e=>{const fl=e.target.files[0];if(!fl)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d.clients||!d.inv||!d.rdv)throw 0;if(confirm('Remplacer toutes les données actuelles ?')){const fl2=d.files||{};delete d.files;restoreFiles(fl2);db=d;db.settings={...DEF.settings,...db.settings};db.requests=db.requests||[];db.site=db.site||{};['gallery','reviews','team'].forEach(k=>db.site[k]=db.site[k]||[]);save();renderSite();render()}}catch(x){alert('Fichier invalide.')}};rd.readAsText(fl)};
 }
 
@@ -1053,7 +1053,7 @@ function readReq(F){
  const r={id:uid(),ref:'RDV-'+Math.random().toString(36).slice(2,6).toUpperCase(),created:new Date().toISOString(),statut:'attente',
   nom:f.nom.trim(),tel:f.tel.trim(),email:(f.email||'').trim(),age:(f.age||'').trim(),type:f.type,societe:f.type==='entreprise'?f.societe.trim():'',
   soin:f.soin,date:f.date,creneau:f.creneau||'',msg:(f.msg||'').trim()};
- db.requests.push(r);save();updBadge();return r;
+ db.requests.push(r);save();updBadge();window.cloudRequest&&window.cloudRequest(r);return r;
 }
 const reqToCabinet=r=>`Bonjour, je souhaite un rendez-vous au ${S().name}.\nRéf : ${r.ref}\nNom : ${r.nom}\nTél : ${r.tel}\nSoin : ${r.soin}\nDate souhaitée : ${frDate(r.date)} (${CRE[r.creneau]})${r.societe?'\nEntreprise : '+r.societe:''}${r.msg?'\nPrécisions : '+r.msg:''}`;
 const waLink=(tel,txt)=>`https://wa.me/${intl(tel)}?text=${encodeURIComponent(txt)}`;
@@ -1216,6 +1216,88 @@ document.addEventListener('click',e=>{
  else if(a==='export')exportAll();
 });
 renderSite();
+</script>
+
+<script type="module">
+/* ===== SYNCHRONISATION FIREBASE (Firestore + Auth) ===== */
+const FIREBASE_CONFIG={
+  apiKey:"REMPLACER",
+  authDomain:"REMPLACER.firebaseapp.com",
+  projectId:"REMPLACER",
+  storageBucket:"REMPLACER.appspot.com",
+  messagingSenderId:"REMPLACER",
+  appId:"REMPLACER"
+};
+const ADMIN_EMAIL="REMPLACER@exemple.com"; /* email du compte créé dans Firebase > Authentication */
+
+if(FIREBASE_CONFIG.apiKey!=="REMPLACER"){
+const V="10.14.1",B="https://www.gstatic.com/firebasejs/"+V+"/";
+const [{initializeApp},F,A]=await Promise.all([import(B+"firebase-app.js"),import(B+"firebase-firestore.js"),import(B+"firebase-auth.js")]);
+const app=initializeApp(FIREBASE_CONFIG),fs=F.getFirestore(app),au=A.getAuth(app);
+const PRIV=['pw','pin','ejsService','ejsTemplate','ejsKey'];
+const clean=o=>JSON.parse(JSON.stringify(o));
+const local=()=>{try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){}};
+const pickPub=()=>{const st={};for(const k in db.settings)if(!PRIV.includes(k))st[k]=db.settings[k];return clean({settings:st,site:db.site})};
+const pickPriv=()=>{const st={};PRIV.forEach(k=>{if(db.settings[k]!==undefined)st[k]=db.settings[k]});return clean({clients:db.clients,rdv:db.rdv,inv:db.inv,priv:st})};
+const isAdmin=()=>au.currentUser&&au.currentUser.email&&au.currentUser.email.toLowerCase()===ADMIN_EMAIL.toLowerCase();
+let ready=false,unsubs=[],lastReq={},lastPriv='',lastPub='',timer=null;
+const appVisible=()=>!document.getElementById('app').classList.contains('hidden');
+const refresh=()=>{try{updBadge();renderSite();if(appVisible())render()}catch(e){}};
+
+/* 1) Tous les visiteurs : contenu public du site (horaires, tél., équipe, avis…) */
+try{const p=await F.getDoc(F.doc(fs,'public','site'));
+ if(p.exists()){const d=p.data();Object.assign(db.settings,d.settings||{});db.site={...db.site,...(d.site||{})};['gallery','reviews','team'].forEach(k=>db.site[k]=db.site[k]||[]);lastPub=JSON.stringify(pickPub());local();renderSite()}}catch(e){console.warn('Lecture publique impossible',e)}
+
+/* 2) Demande envoyée par un patient -> base partagée */
+window.cloudRequest=async r=>{try{await F.setDoc(F.doc(fs,'requests',r.id),clean(r));lastReq[r.id]=JSON.stringify(clean(r))}catch(e){console.warn('Envoi demande impossible',e)}};
+
+/* 3) Espace gestion : données privées en temps réel */
+function startSync(){return new Promise(resolve=>{
+ if(unsubs.length){resolve();return}
+ let n=0;const one=()=>{if(++n===2){ready=true;resolve()}};
+ let first1=true,first2=true;
+ unsubs.push(F.onSnapshot(F.doc(fs,'private','data'),snap=>{
+  if(snap.metadata.hasPendingWrites)return;
+  if(snap.exists()){const d=snap.data(),j=JSON.stringify(d);
+   if(j!==lastPriv){lastPriv=j;db.clients=d.clients||[];db.rdv=d.rdv||[];db.inv=d.inv||[];Object.assign(db.settings,d.priv||{});local();if(!first1)refresh()}}
+  else if(first1){/* base vide : on envoie les données de cet appareil */ ready=true;window.cloudPush(true)}
+  if(first1){first1=false;one()}
+ },e=>{console.error(e);if(first1){first1=false;one()}}));
+ unsubs.push(F.onSnapshot(F.collection(fs,'requests'),snap=>{
+  if(snap.metadata.hasPendingWrites)return;
+  const arr=[];lastReq={};snap.forEach(d=>{const r=d.data();arr.push(r);lastReq[r.id]=JSON.stringify(r)});
+  const merged=new Map(arr.map(r=>[r.id,r]));
+  /* demandes locales jamais envoyées : on les pousse */
+  db.requests.forEach(r=>{if(!merged.has(r.id)&&first2){merged.set(r.id,r);F.setDoc(F.doc(fs,'requests',r.id),clean(r)).catch(()=>{});lastReq[r.id]=JSON.stringify(clean(r))}});
+  db.requests=[...merged.values()];local();if(!first2)refresh();else try{updBadge()}catch(e){}
+  if(first2){first2=false;one()}
+ },e=>{console.error(e);if(first2){first2=false;one()}}));
+})}
+function stopSync(){unsubs.forEach(u=>u());unsubs=[];ready=false}
+
+/* 4) Écriture (debounce) à chaque save() de l'admin */
+window.cloudPush=(now)=>{
+ if(!ready||!isAdmin())return;
+ clearTimeout(timer);
+ const go=async()=>{try{
+  const pr=pickPriv(),pb=pickPub(),a=JSON.stringify(pr),b=JSON.stringify(pb);
+  if(a!==lastPriv){lastPriv=a;await F.setDoc(F.doc(fs,'private','data'),pr)}
+  if(b!==lastPub){lastPub=b;await F.setDoc(F.doc(fs,'public','site'),pb)}
+  const ids=new Set();
+  for(const r of db.requests){ids.add(r.id);const j=JSON.stringify(clean(r));if(lastReq[r.id]!==j){lastReq[r.id]=j;await F.setDoc(F.doc(fs,'requests',r.id),clean(r))}}
+  for(const id of Object.keys(lastReq))if(!ids.has(id)){delete lastReq[id];await F.deleteDoc(F.doc(fs,'requests',id))}
+ }catch(e){console.error(e);alert('Synchronisation impossible : '+(e.code||e.message)+'\nVos données restent enregistrées sur cet appareil.')}};
+ if(now)go();else timer=setTimeout(go,700);
+};
+
+/* 5) Connexion / mot de passe (remplace l'ancien mot de passe local) */
+window.cloudLogin=async pw=>{
+ try{await A.signInWithEmailAndPassword(au,ADMIN_EMAIL,pw)}catch(e){return false}
+ await startSync();return true};
+window.cloudCheckPw=async pw=>{try{await A.signInWithEmailAndPassword(au,ADMIN_EMAIL,pw);return true}catch(e){return false}};
+window.cloudSetPw=async pw=>{await A.updatePassword(au.currentUser,pw)};
+A.onAuthStateChanged(au,u=>{if(u&&isAdmin())startSync();else stopSync()});
+}
 </script>
 </body>
 </html>
